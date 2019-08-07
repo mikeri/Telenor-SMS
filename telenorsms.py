@@ -7,6 +7,10 @@ import json
 import os
 
 
+class AuthenticationError(Exception):
+    pass
+
+
 class TelenorSMS:
     def __init__(self, sender, password):
         session = requests.Session()
@@ -30,8 +34,9 @@ class TelenorSMS:
         result = session.post(password_url, data=password_data)
 
         saml_response = self.get_input_tag(result.text, "samlResponse")
+        if not saml_response:
+            raise AuthenticationError("Missing SAML response")
         connect_id = self.get_input_tag(result.text, "connect_id")
-
         telenor_id = session.cookies.get_dict()["telenor_id"]
         saml_data = {
             "samlResponse": saml_response,
@@ -50,6 +55,8 @@ class TelenorSMS:
 
     def get_input_tag(self, html, name):
         class AttrParser(HTMLParser):
+            self.result = False
+
             def handle_starttag(self, tag, attrs):
                 if tag == "input":
                     attr_dict = dict((attr, value) for attr, value in attrs)
@@ -65,14 +72,14 @@ class TelenorSMS:
         response = self.session.post(self.sms_url, sms_data)
         result = response.json()
         try:
-            if response.json()["result"] == "OK":
+            if result["result"] == "OK":
                 print("OK")
         except json.JSONDecodeError:
             print("Failed")
             exit(1)
         except KeyError:
             print("Failed")
-            print(response.json())
+            print(result)
             exit(1)
 
 
